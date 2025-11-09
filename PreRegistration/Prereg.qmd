@@ -1,0 +1,160 @@
+---
+format:
+  docx:
+    title: "Preregistration for A Randomized Experiment to Target High Risk Gun Offenders in Denver, Colorado"
+    date: today
+    date-format: YYYY-MM-DD
+    author: 
+        - "Andrew P. Wheeler, PhD"
+        - "                                                                                          "
+        - "![](Transparent_CDC.png){ width=32% }"
+    toc: true
+    toc-depth: 2
+    reference-doc: CDC_Template.docx
+    bibliography: ref.bib
+    csl: chicago-author-date.csl
+    execute:
+        cache: false
+
+execute:
+  eval: true
+  echo: false
+  warning: false
+---
+
+```{=openxml}
+<w:p>
+  <w:r>
+    <w:br w:type="page"/>
+  </w:r>
+</w:p>
+```
+
+# Introduction
+
+This is a *pre-registration* plan for the [Arnold Ventures funded project](https://www.arnoldventures.org/newsroom/grants-announcement-arnold-ventures-criminal-justice-research-grants-in-first-half-of-2025-demonstrate-its-ongoing-commitment-to-evidence-based-solutions), *A Randomized Experiment to Target High Risk Gun Offenders in Denver, Colorado*.
+
+Any subsequent deviation from this protocol for the analysis will be *explicitly* detailed in any subsequent report, along with the reasoning why the analysis was not conducted in the methodology suggested. I commit here to be transparent in any deviations in any subsequent analysis.
+
+This pre-registration plan will also be submitted to ArDrive publicly and posted in my [*Preregistration* folder](https://app.ardrive.io/#/drives/e78bf075-4f13-4b9d-8e11-dc6fb7352329?name=Preregistration), as well as to the Arnold Foundation via email directly.
+
+# The Point of Pre-registration
+
+The point of pre-registration is to explicitly detail hypotheses you will be testing. Without pre-specifying this information, one can run statistical tests, and then only report ones that support some supported hypothesis for the author.
+
+Analyses are not conducted in a vacuum though, and ultimately they are built upon from prior analyses. I have previously conducted predictive modeling of chronic offenders [@wheeler2019accuracy]. And I have experience conducting analysis of crime counts in quasi-experimental settings [@wheeler2018simple; @wheeler2018quasi]. These will both inform what I think is reasonable, given my understanding of the data, what are reasonable effect sizes, and what is possible in current software at the time of writing.
+
+I have previously conducted simulations for the initial letter of interest (see the `power.py` set of code in the `/ArnoldProposal` folder). And I have written some testing code for the predictive modeling. In this pre-registration plan I will be clear those prior analyses undertaken, as well as how I plan to conduct the analysis moving forward. You can also see the initial project proposal in that same folder as well. There are not any major differences between this pre-registration report and the initial proposal, although this pre-registration will be more detailed.
+
+There will be two major components to the pre-registration -- specifying a predictive model, and the outcome evaluation.
+
+# Choosing a predictive model
+
+Using historical entity linked data from Denver PD from 2019-01-01 through 2025-08-25, I will generate a predictive model based on the offenders prior 3 years of data (arrests, victimizations, and on-scene information) to predict the subsequent year of data. No other demographic data will be used in the modeling. Prior crimes and victimizations tend to be the strongest predictors of future involvement in gun violence [@heller2024machine; @wheeler2019accuracy].
+
+The main outcome variable, being involved with future violence, will be defined as either a victimization or offense associated with NIBRS offenses of:
+
+ - Homicide (NIBRS code 09)
+ - Kidnapping (NIBRS code 10)
+ - Sexual Assault (NIBRS code 11)
+ - Robbery (NIBRS code 12)
+ - Aggravated Assault (NIBRS code 13.15, 13.14, 13.10, and 13.11 in Denver data)
+ - Weapons Offenses (NIBRS code 52)
+
+These are used as the main outcome of interest is to prevent future *gun violence*. Hence weapon offenses with guns are also used in the predictive model. These outcomes will then be aggregated to a yearly count for individuals.
+
+The variables used to predict this outcome will be prior police contacts in the prior years, broken into specific events as well as time periods. Those events will be:
+
+ - Murder (NIBRS code 9)
+ - Rape (NIBRS code 11,10,64)
+ - Aggravated Assault (NIBRS codes 13.15,13.14,13.10,13.11 in Denver data)
+ - Simple Assault (NIBRS codes 13.13 and 13.16 in Denver data)
+ - Motor Vehicle Theft (NIBRS 24)
+ - Weapon Offenses (NIBRS 52)
+ - Thefts (NIBRS code 23, 21, 25, 27, 28, 51, 26, 58, 71, 63)
+ - Burglary (NIBRS code 22)
+ - Robbery (NIBRS code 12)
+ - Mischief (NIBRS codes 20, 29, 72, 40, 41, 57, 73, 62, 70)
+ - Drugs (NIBRS code 35)
+ - Other (NIBRS codes 54, 100, 30, 37, 39, 53, 36, 38, 50, 48, 55, 99, 93, 90, 91, 49)
+
+The outcome metrics to choose a predictive model will be based on the weighted ROC curve, where weights are determined via the total crime counts, as well as the top 1000 ranked individuals in the predictive model, how many violent arrests or victimizations were they associated with. The weighted ROC curve is the same as the typical GINI curve, using the predictions to rank order the observations instead of the actual crime counts.
+
+I will conduct the predictive modeling in two stages. The first stage will generate a larger set of data, using cohorts from:
+
+ - 2019-2021 to predict 2022
+ - 2020-2022 to predict 2023
+ - 2021-2023 to predict 2024
+
+Three years of data was specified in concert with Denver PD. Using this set of data, I will split the data into 5 mutually exclusive k-folds (where each fold no single person is split across the folds). For these k-folds, I will use the python library `optuna` to conduct a search over the model parameters that gives the best average results over 60 trials for each different model. To merge the two metrics, I will turn the top-1000 into a metric similar to the Predictive Efficiency Index [@wheeler2021mapping], I will divide the metric by the best possible number of events that could be in that specific fold.
+
+The models, and their hyperparameters will be:
+
+ - OLS (no-hyperparameters)
+ - CatBoostRegressor
+   - n_estimators from 50 to 1000
+   - max_depth from 2 to 10
+   - min_data_in_leaf from 1 to 100
+   - loss function RMSE or Poisson
+ - LightboostedRegressor
+   - n_estimators from 50 to 1000
+   - max_depth from 2 to 10
+   - min_data_in_leaf from 1 to 100
+ - XGBRegressor
+   - n_estimators from 50 to 1000
+   - max_depth from 2 to 10
+
+These models tend to be popular in prediction competitions [@circo2025open], and XGBoost in particular has been used in the exact same context for predicting chronic gun offenders [@heller2024machine; @wheeler2019accuracy].
+
+Initial testing of the library, while turning the data into binary 0/1 and estimating binary predictive models resulted in similar weighted ROC curves, it failed to capture nearly the amount of events in the data compared to the regressor models. As such, the subsequent analysis will only focus on the regressor models. Similarly Lasso models did not do well in initial testing with varying alpha levels, so they will not be considered.
+
+Based on those optimized models, I will then choose the best model, and compare to final hold out sample of data, using prior events from 2021-08-25 through 2024-08-24 to predict events in 2024-08-25 through 2025-08-25. This final hold out will be used to determine that the model is sufficient to be sent into production into actual Denver PD. I expect this final hold out sample to have at least:
+
+ - over 0.7 weighted ROC
+ - over 200 events in the top 1000 observations
+
+Lower than this and it will signify potential issues with the predictive model.
+
+# Selecting Treated and Controls
+
+Once the predictive model is determined, I will work with Denver PD to generate new predictions every week. Those predictions will then randomly determine the top 100 ranked inviduals (among those who have not been previously chosen), and randomly allocate them to either treated home visits that week, or control cases.
+
+Each week, the model will be the same, but the prediction will incorporate new data into the predictive model. I will keep a database of who has been assigned to be treated, as well as who has been assigned control and on what dates.
+
+# Evaluating the outcomes
+
+The main outcomes I will be evaluating are the same as the predictive model, those assigned to treatment I will examine whether they have fewer violent and gun offenses or victimizations, defined again as:
+
+ - Homicide (NIBRS code 09)
+ - Kidnapping (NIBRS code 10)
+ - Sexual Assault (NIBRS code 11)
+ - Robbery (NIBRS code 12)
+ - Aggravated Assault (NIBRS code 13.15, 13.14, 13.10, and 13.11 in Denver data)
+ - Weapons Offenses (NIBRS code 52)
+
+It is likely Denver PD will be interested in examining subgroup analysis or other specific crime outcomes (such as offending vs victimization, or even expanding to other crimes), but this will be the main outcome via which the evaluation is determined a success.
+
+The analysis will be a Poisson regression based on a panel of individuals who could be potentially exposed to treatment (with entry based on being in the top 100). The model will be:
+
+$$\log(\mathbb{E}[V_{it}]) = \beta_0 + \beta_1\text{treat}_{it} + \gamma_t$$
+
+Where $treat_{it}$ is equal to 1 in the weeks after the treatment occurred for individual $i$, and zero otherwise. $\gamma_t$ is a week fixed effect, to take into account potential seasonality of violent crimes over time. And we estimate this Poisson regression equation using cluster robust standard errors at the person level.
+
+This is a modified version of step-wedge trial. The only difference is that individuals may be added at later stages (if one has a victimization in the prior time period, they may increase into the top 100, and so be entered into the design at a later stage).
+
+This will be estimated using the statsmodels library in python. See the prior `power.py` analysis. Based on those power simulations, we estimate that we will need to run the experiment for several years to detect an effect on the order of a 20% reduction in violent events.
+
+In addition to this regression analysis, to provide more near-term feedback to Denver PD, I will also provide a running, simpler estimate of the total crime reductions using a modified weighted displacement different metrics [@WDD_Overtime]. This will be used in dashboards, and will be reported in the final outcome analysis, but will not be the main outcome of interest. The Poisson regression with the clustered standard errors at the person level will be the main outcome of focus.
+
+```{=openxml}
+<w:p>
+  <w:r>
+    <w:br w:type="page"/>
+  </w:r>
+</w:p>
+```
+
+# References
+
+::: {#refs}
+:::

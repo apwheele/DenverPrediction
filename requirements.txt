@@ -1,0 +1,16 @@
+# conda create --name chronpred python=3.12 pip
+# conda activate chronpred
+# pip install -r requirements.txt
+matplotlib
+seaborn
+pandas
+numpy
+scikit-learn
+xgboost
+catboost
+lightgbm
+statsmodels
+patsy
+plotnine
+jupyter
+# also requires installing quarto
