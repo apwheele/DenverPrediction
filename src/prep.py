@@ -1,7 +1,7 @@
 '''
 This preps the data
 '''
-
+from ast import comprehension
 import pandas as pd
 import numpy as np
 import os
@@ -9,10 +9,13 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+np.random.seed(10)
+
 d = './data'
 ent_old = f'{d}/entity_data_2019to2022.csv'
 ent_new = f'{d}/entity_data_2022topres.csv'
 inc_data = f'{d}/incident_data_2019topres.csv'
+lookup_path = f'{d}/LookupTable.csv.zip'
 
 t = './train_data'
 train_data_path = f'{t}/TrainData.csv.zip'
@@ -25,6 +28,18 @@ def get_data():
     e2 = pd.read_csv(ent_new)
     ent_data = pd.concat([e1,e2],ignore_index=True)
     ent_data['occ_date'] = pd.to_datetime(ent_data['occ_date'])
+    # de-identifying starts here
+    pin_ref = ent_data['pin'].drop_duplicates().copy()
+    pin_ref['rand'] = np.random.random(len(pin_ref))
+    pin_ref = pin_ref.sort_values('rand').reset_index(drop=True)
+    pin_ref['pin_new'] = np.arrange(1, len(pin_ref) + 1)
+    pin_ref = pin_ref.drop(columns=['rand'], inplace=True)
+    # merge in de-identified pins
+    ent_data = ent_data.merge(pin_ref, on='pin', how='left')
+    ent_data['pin'] = ent_data['pin_new']
+    ent_data = ent_data.drop(columns=['pin_new'], inplace=True)
+    # save out pin key
+    pin_ref.to_csv(lookup_path, index=False)
     # Merging in XY from incident data
     inc_d = pd.read_csv(inc_data)
     # To check nibr codes

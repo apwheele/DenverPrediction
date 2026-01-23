@@ -6,6 +6,7 @@
 # code to strip those out
 HoldOutData.csv.zip
 TrainData.csv.zip
+LookupTable.csv.zip
 
 # original data for Arnold LOI
 ArnoldProposal/data_dictionary.docx
