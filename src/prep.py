@@ -29,15 +29,15 @@ def get_data():
     ent_data = pd.concat([e1,e2],ignore_index=True)
     ent_data['occ_date'] = pd.to_datetime(ent_data['occ_date'])
     # de-identifying starts here
-    pin_ref = ent_data['pin'].drop_duplicates().copy()
+    pin_ref = ent_data[['pin']].drop_duplicates().reset_index(drop=True).copy()
     pin_ref['rand'] = np.random.random(len(pin_ref))
     pin_ref = pin_ref.sort_values('rand').reset_index(drop=True)
-    pin_ref['pin_new'] = np.arrange(1, len(pin_ref) + 1)
-    pin_ref = pin_ref.drop(columns=['rand'], inplace=True)
+    pin_ref['pin_new'] = np.arange(1, len(pin_ref) + 1)
+    pin_ref = pin_ref.drop(columns=['rand'])
     # merge in de-identified pins
     ent_data = ent_data.merge(pin_ref, on='pin', how='left')
     ent_data['pin'] = ent_data['pin_new']
-    ent_data = ent_data.drop(columns=['pin_new'], inplace=True)
+    ent_data = ent_data.drop(columns=['pin_new'])
     # save out pin key
     pin_ref.to_csv(lookup_path, index=False)
     # Merging in XY from incident data
