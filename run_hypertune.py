@@ -7,8 +7,8 @@ import pandas as pd
 
 from sklearn.linear_model import LinearRegression
 from src import models
-from src import train_data, x_vars
-from src.hypertune import (cv_eval, objective_cat, objective_lgb, objective_xgb)
+from src.prep import train_data, x_vars
+from src.hypertune import cv_eval, objective_cat, objective_lgb, objective_xgb
 
 
 res_results = {}
@@ -18,7 +18,7 @@ res_results = {}
 
 y = 'violent_vicoffy'
 k = 5
-k_folds = models.kfold_split(train_data, split='pin')
+k_folds = models.kfold_split(train_data, k, split='pin')
 
 #####################################
 # OLS baseline
@@ -69,15 +69,18 @@ output.append({
 for m, t in res_results.items():
     if m == 'ols':
         continue
-    print(f"Best Score {m} {t.value}")
+    
+    score = t["value"]
+    params = t["params"]
+    print(f"Best Score {m} {score}")
     print("Best Params")
-    print(t.params)
+    print(params)
 
     output.append({
         "model": m,
-        "score": t.value,
-        "params": str(t.params)
+        "score": score,
+        "params": str(params)
     })
 
 df = pd.DataFrame(output)
-df.to_csv("./models/tuning_results.csv", index=False)
+df.to_csv("./output/tuning_results.csv", index=False)

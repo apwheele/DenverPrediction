@@ -13,4 +13,5 @@ statsmodels
 patsy
 plotnine
 jupyter
+optuna
 # also requires installing quarto

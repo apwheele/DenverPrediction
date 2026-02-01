@@ -5,7 +5,6 @@ Hyptertuning models
 from src import models
 import numpy as np
 
-from sklearn.linear_model import LinearRegression
 from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
@@ -37,7 +36,7 @@ def fold_objective(metric_rows, pei_denoms):
     return 0.5 * wauc + 0.5 * pei
 
 # produce metric for model ranking
-def cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=1000):
+def cv_eval(rm, data, ki, y_name, k_top=1000):
     metric_rows = []
     pei_denoms = []
 
@@ -49,9 +48,10 @@ def cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=1000):
         test = data[ki == fold].reset_index(drop=True)
 
         rm.fit(train)
-        test['pred'] = rm.predict(test)
+        test_eval = test.copy()
+        test_eval['pred'] = rm.predict(test_eval)
 
-        met = models.metrics(y_name, 'pred', test)
+        met = models.metrics(y_name, 'pred', test_eval)
         metric_rows.append(met)
 
         pei_denoms.append(best_possible_topk(test[y_name], k=k_top))
@@ -101,7 +101,8 @@ def objective_lgb(x_vars, y, train_data, k_folds, k_top=1000):
             mod=LGBMRegressor(
                 n_estimators=param['n_estimators'],
                 max_depth=param['max_depth'],
-                min_data_in_leaf=param['min_data_in_leaf']))
+                min_data_in_leaf=param['min_data_in_leaf'],
+                verbose=-1))
         return cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
     return _objective
 
@@ -121,6 +122,7 @@ def objective_xgb(x_vars, y, train_data, k_folds, k_top=1000):
             bin_y=False,
             mod=XGBRegressor(
                 n_estimators=param['n_estimators'],
-                max_depth=param['max_depth']))
+                max_depth=param['max_depth'],
+                verbosity=0))
         return cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
     return _objective
