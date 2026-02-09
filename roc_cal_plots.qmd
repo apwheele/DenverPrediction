@@ -1,0 +1,71 @@
+---
+title: "ROC and Calibration Plots"
+format:
+  html:
+    toc: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{python}
+import pandas as pd
+import numpy as np
+
+from src import binary_plots as pb
+
+OUT_DIR = "./output/final_model"
+
+pred = pd.read_csv(f"{OUT_DIR}/holdout_predictions.csv")
+met = pd.read_csv(f"{OUT_DIR}/metrics.csv").iloc[0]
+
+Y = met["y"]
+
+# removable
+if "y_bin" not in pred.columns:
+    pred["y_bin"] = (pred[Y] > 0).astype(int)
+
+assert "prob" in pred.columns, "holdout_predictions.csv must include `prob` (calibrated probability)."
+assert ((pred["prob"] >= 0) & (pred["prob"] <= 1)).all(), "`prob` must be in [0,1]"
+
+plot_dat = pred[["y_bin", "prob"]].copy()
+plot_dat.rename(columns={"y_bin": "Y", "prob": "P"}, inplace=True)
+```
+
+Summary
+```{python}
+print("Model:", met["model"])
+print("Outcome:", Y)
+print("Holdout N:", int(met["holdout_n"]))
+print("Holdout positive rate (y>0):", float(met["holdout_positive_rate"]))
+print("Holdout WeightedAUC (matches tuning):", float(met["holdout_weighted_auc"]))
+print("Holdout Top-1000 events captured:", float(met["holdout_top1000_weight"]))
+print("Best params:", met["best_params"])
+```
+
+ROC curves
+
+```{python}
+# This will display the ROC plot and return the underlying ROC data
+roc_df = pb.auc_plot(
+    data=plot_dat,
+    y_true="Y",
+    y_scores=["P"],
+    figsize=(6,6),
+    save_plot=False
+)
+```
+
+Cal plot
+```{python}
+cal_bins = pb.cal_data(
+    prob="P",
+    true="Y",
+    data=plot_dat,
+    bins=10,
+    plot=True,
+    figsize=(6,4),
+    save_plot=False
+)
+```

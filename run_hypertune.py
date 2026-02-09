@@ -16,7 +16,7 @@ res_results = {}
 #####################################
 # setup
 
-y = 'violent_vicoffy'
+y = 'property_vicoffy'
 k = 5
 k_folds = models.kfold_split(train_data, k, split='pin')
 
@@ -29,57 +29,79 @@ rm_ols = models.Mod(
     mod=LinearRegression(),
 )
 
-res_results['ols'] = {'value':cv_eval(rm_ols, data=train_data, ki=k_folds, y_name=y),'params': {}}
+score, wauc, pei, top1k = cv_eval(rm_ols, data=train_data, ki=k_folds, y_name=y)
+
+res_results['ols'] = {
+    'value': score,
+    'params': {},
+    'wauc': wauc,
+    'pei': pei,
+    'top1k': top1k
+}
 
 #####################################
 # CatBoost
 study_cat = optuna.create_study(direction='maximize')
 study_cat.optimize(objective_cat(x_vars, y, train_data, k_folds), n_trials=60)
-res_results['cat'] = {'value':study_cat.best_trial.value,'params': study_cat.best_trial.params}
+res_results['cat'] = {
+    'value': study_cat.best_trial.value,
+    'params': study_cat.best_trial.params,
+    'wauc': study_cat.best_trial.user_attrs.get("WeightedAUC"),
+    'pei': study_cat.best_trial.user_attrs.get("PEI"),
+    'top1k': study_cat.best_trial.user_attrs.get("Top1000_Weight"),
+   }
+
 
 
 #####################################
 # LightBoost
 study_lgb = optuna.create_study(direction='maximize')
 study_lgb.optimize(objective_lgb(x_vars, y, train_data, k_folds), n_trials=60)
-res_results['lgb'] = {'value':study_lgb.best_trial.value,'params': study_lgb.best_trial.params}
+res_results['lgb'] = {
+    'value': study_lgb.best_trial.value,
+    'params': study_lgb.best_trial.params,
+    'wauc': study_lgb.best_trial.user_attrs.get("WeightedAUC"),
+    'pei': study_lgb.best_trial.user_attrs.get("PEI"),
+    'top1k': study_lgb.best_trial.user_attrs.get("Top1000_Weight"),
+   }
 
 
 #####################################
 # XGBReg
 study_xgb = optuna.create_study(direction='maximize')
 study_xgb.optimize(objective_xgb(x_vars, y, train_data, k_folds), n_trials=60)
-res_results['xgb'] = {'value':study_xgb.best_trial.value,'params': study_xgb.best_trial.params}
+res_results['xgb'] = {
+    'value': study_xgb.best_trial.value,
+    'params': study_xgb.best_trial.params,
+    'wauc': study_xgb.best_trial.user_attrs.get("WeightedAUC"),
+    'pei': study_xgb.best_trial.user_attrs.get("PEI"),
+    'top1k': study_xgb.best_trial.user_attrs.get("Top1000_Weight"),
+   }
+
 
 
 ####################################
 # print + save
 print('\n\nTRIAL RESULTS\n\n')
-print(f"Best Score ols {res_results['ols']['value']}")
-print("Best Params")
-print(res_results['ols']['params'])
-
-output = []
-output.append({
-    "model": "ols",
-    "score": res_results["ols"]["value"],
-    "params": str(res_results["ols"]["params"])
-})
 
 for m, t in res_results.items():
-    if m == 'ols':
-        continue
-    
-    score = t["value"]
-    params = t["params"]
-    print(f"Best Score {m} {score}")
-    print("Best Params")
-    print(params)
+    print(f"Best Score {m}: {t['value']}")
+    print("WeightedAUC:", t.get("wauc"))
+    print("PEI:", t.get("pei"))
+    print("Top1000:", t.get("top1k"))
+    print("Best Params:")
+    print(t["params"])
+    print("")
 
+output = []
+for m, t in res_results.items():
     output.append({
         "model": m,
-        "score": score,
-        "params": str(params)
+        "score": t["value"],
+        "weighted_auc": t.get("wauc"),
+        "pei": t.get("pei"),
+        "top1000_weight": t.get("top1k"),
+        "params": str(t["params"])
     })
 
 df = pd.DataFrame(output)

@@ -56,7 +56,17 @@ def cv_eval(rm, data, ki, y_name, k_top=1000):
 
         pei_denoms.append(best_possible_topk(test[y_name], k=k_top))
 
-    return fold_objective(metric_rows, pei_denoms)
+    wauc = float(np.mean([m['WeightedAUC'] for m in metric_rows]))
+    top1k = float(np.mean([m['Top1000_Weight'] for m in metric_rows]))
+
+    pei = float(np.mean([
+        float(m['Top1000_Weight']) / d if d > 0 else 0.0
+        for m, d in zip(metric_rows, pei_denoms)
+    ]))
+
+    score = 0.5 * wauc + 0.5 * pei
+    return score, wauc, pei, top1k
+
 
 ##############################################
 # Tuning functions
@@ -81,7 +91,11 @@ def objective_cat(x_vars, y, train_data, k_folds, k_top=1000):
                 loss_function=param['loss_function'],
                 allow_writing_files=False,
                 verbose=False))
-        return cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        score, wauc, pei, top1k = cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        trial.set_user_attr("WeightedAUC", wauc)
+        trial.set_user_attr("PEI", pei)
+        trial.set_user_attr("Top1000_Weight", top1k)
+        return score
     return _objective
 
 
@@ -103,7 +117,11 @@ def objective_lgb(x_vars, y, train_data, k_folds, k_top=1000):
                 max_depth=param['max_depth'],
                 min_data_in_leaf=param['min_data_in_leaf'],
                 verbose=-1))
-        return cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        score, wauc, pei, top1k = cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        trial.set_user_attr("WeightedAUC", wauc)
+        trial.set_user_attr("PEI", pei)
+        trial.set_user_attr("Top1000_Weight", top1k)
+        return score
     return _objective
 
 
@@ -124,5 +142,9 @@ def objective_xgb(x_vars, y, train_data, k_folds, k_top=1000):
                 n_estimators=param['n_estimators'],
                 max_depth=param['max_depth'],
                 verbosity=0))
-        return cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        score, wauc, pei, top1k = cv_eval(rm, data=train_data, ki=k_folds, y_name=y, k_top=k_top)
+        trial.set_user_attr("WeightedAUC", wauc)
+        trial.set_user_attr("PEI", pei)
+        trial.set_user_attr("Top1000_Weight", top1k)
+        return score
     return _objective

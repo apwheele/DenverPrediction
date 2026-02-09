@@ -125,7 +125,25 @@ def get_data():
     ent_data['violent_vic'] = (np.floor(ent_data['ucr']/100).astype(int).isin([9,10,11,12,13,52]))*ent_data['vic']
     ent_data['violent_vicoff'] = (np.floor(ent_data['ucr']/100).astype(int).isin([9,10,11,12,13,52]))*(ent_data['vic'] + ent_data['off'])
     
-    out_vars = ['violent_off','violent_vic','violent_vicoff']
+    # make new vars for property crime models
+    prop_codes = [24,                           # MVT
+        23, 21, 25, 27, 28, 51, 26, 58, 71, 63, # Theft
+        22,                                     # Burglary
+        20, 29, 72, 40, 41, 57, 73, 62, 70]     # Mischief
+    
+    ent_data['property_off'] = (er.astype(int).isin(prop_codes)) * ent_data['off']
+    ent_data['property_vic'] = (er.astype(int).isin(prop_codes)) * ent_data['vic']
+    ent_data['property_vicoff'] = (er.astype(int).isin(prop_codes)) * (ent_data['vic'] + ent_data['off'])
+
+    # individual prop crime vars
+    ent_data['theft_vicoff'] = ent_data['Theft'] * (ent_data['vic'] + ent_data['off'])
+    ent_data['burglary_vicoff'] = ent_data['Burglary'] * (ent_data['vic'] + ent_data['off'])
+    ent_data['mvtheft_vicoff'] = ent_data['MVTheft'] * (ent_data['vic'] + ent_data['off'])
+    ent_data['mischief_vicoff'] = ent_data['Mischief'] * (ent_data['vic'] + ent_data['off'])
+
+    out_vars = ['violent_off','violent_vic','violent_vicoff', 'property_off',
+                'property_vic', 'property_vicoff', 'theft_vicoff', 'burglary_vicoff',
+                'mvtheft_vicoff', 'mischief_vicoff']
     
     cvars = ['Murder', 'Rape', 'AggAssault', 'SimpAssault', 'MVTheft', 'Weapon', 
              'Theft', 'Burglary', 'Robbery', 'Mischief', 'Drugs', 'Other']
@@ -175,7 +193,7 @@ def get_data():
         b1 = f'{ey - 1}-{end[5:]}'
         gs1 = get_x(b1,end,'p1')
         b6m = (ed - pd.DateOffset(months=6)).strftime('%Y-%m-%d')
-        gs6m = get_x(b3,end,'6m')
+        gs6m = get_x(b6m,end,'6m')
         # getting the Y variable, 1 year in future
         y1f = (ed + pd.DateOffset(months=12)).strftime('%Y-%m-%d')
         year_out = y1f[:4]
@@ -209,7 +227,9 @@ def get_data():
     # Get rid of rows 
     return train_data, final_hold_out
 
-y_vars = ['violent_offy','violent_vicy','violent_vicoffy']
+y_vars = ['violent_offy','violent_vicy','violent_vicoffy', 'property_offy',
+                'property_vicy', 'property_vicoffy', 'theft_vicoffy', 'burglary_vicoffy',
+                'mvtheft_vicoffy', 'mischief_vicoffy']
 no_vars = ['pin','YEAR']
 
 if os.path.exists(train_data_path):

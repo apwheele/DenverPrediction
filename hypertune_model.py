@@ -12,7 +12,7 @@ k = 5
 k_folds = models.kfold_split(train_data,k,split='pin')
 
 # init a CatBoost model
-y = 'violent_vicoffy'
+y = 'property_vicoffy'
 #cm = models.Mod(ide_vars=x_vars,y=y,mod=CatBoostRegressor(n_estimators=500,max_depth=3,silent=True),bin_y=False)
 #cm = models.Mod(ide_vars=x_vars,y=y,mod=CatBoostClassifier(n_estimators=500,max_depth=3,silent=True))
 #cm = models.Mod(ide_vars=x_vars,y=y,mod=LinearRegression(),bin_y=False)
