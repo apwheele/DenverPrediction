@@ -1,9 +1,14 @@
 ---
-title: "ROC and Calibration Plots — All Property Crime Models"
 format:
-  html:
+  docx:
+    title: "ROC and Calibration Plots — All Property Crime Models"
+    date: today
+    date-format: YYYY-MM-DD
+    author: "Marc Olson"
     toc: true
-    self-contained: true
+    toc-depth: 2
+    reference-doc: CDC_Template.docx
+
 execute:
   echo: false
   warning: false
@@ -14,6 +19,7 @@ execute:
 import sys
 sys.path.insert(0, r"C:/Users/marc2/Dropbox/Crime De-Coder/DenverPrediction")
 
+import ast
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -58,6 +64,23 @@ preds = {label: pd.read_csv(path, usecols=["y_bin", "prob"])
 auc_vals = {label: roc_auc_score(df["y_bin"], df["prob"])
             for label, df in preds.items()}
 
+# Build model name + hyperparameter strings for calibration plot titles
+_y_to_label = {v: k for k, v in Y_KEYS.items()}
+MODEL_INFO = {}
+for _, row in all_met.iterrows():
+    params = ast.literal_eval(row["best_params"])
+    label  = _y_to_label.get(row["y"], row["y"])
+    m      = row["model"]
+    if m == "lgb_regressor":
+        mod_str = "LightGBM"
+    else:
+        lf      = params.get("loss_function", "RMSE")
+        mod_str = f"CatBoost ({lf})"
+    param_str = (f"n_est={params['n_estimators']} · "
+                 f"depth={params['max_depth']} · "
+                 f"min_leaf={params['min_data_in_leaf']}")
+    MODEL_INFO[label] = f"{mod_str}  |  {param_str}"
+
 # Pre-compute display strings for inline use
 def rand_cap(y):
     return int(round(1000 / n_holdout * prate[y] * n_holdout))
@@ -99,6 +122,57 @@ burg_top_uw  = f"{top1k_uw('Burglary'):,}"
 mvt_top_uw   = f"{top1k_uw('Motor Vehicle Theft'):,}"
 ```
 
+```{python}
+OLS_DIR = f"{OUT_DIR}/ols_outputs"
+OLS_MODELS = {
+    "Property Crime":      f"{OLS_DIR}/property_ols_holdout_predictions.csv",
+    "Theft":               f"{OLS_DIR}/theft_ols_holdout_predictions.csv",
+    "Burglary":            f"{OLS_DIR}/burglary_ols_holdout_predictions.csv",
+    "Motor Vehicle Theft": f"{OLS_DIR}/mvt_ols_holdout_predictions.csv",
+}
+
+# Load OLS predictions including raw y column for top-k calculations
+ols_preds = {}
+for label, path in OLS_MODELS.items():
+    y_col = Y_KEYS[label]
+    ols_preds[label] = pd.read_csv(path, usecols=["y_bin", "prob", y_col])
+
+ols_auc_vals = {label: roc_auc_score(df["y_bin"], df["prob"])
+                for label, df in ols_preds.items()}
+
+ols_met  = pd.read_csv(f"{OLS_DIR}/ols_metrics.csv")
+ols_wauc = dict(zip(ols_met["y"], ols_met["holdout_weighted_auc"]))
+
+def ols_top1k_w(label):
+    df    = ols_preds[label]
+    y_col = Y_KEYS[label]
+    return int(df.nlargest(1000, "prob")[y_col].sum())
+
+def ols_top1k_uw(label):
+    return int(ols_preds[label].nlargest(1000, "prob")["y_bin"].sum())
+
+# Pre-compute OLS display strings
+prop_ols_auc     = f"{ols_auc_vals['Property Crime']:.3f}"
+prop_ols_wauc    = f"{ols_wauc['property_vicoffy']:.3f}"
+prop_ols_top     = f"{ols_top1k_w('Property Crime'):,}"
+prop_ols_top_uw  = f"{ols_top1k_uw('Property Crime'):,}"
+
+theft_ols_auc    = f"{ols_auc_vals['Theft']:.3f}"
+theft_ols_wauc   = f"{ols_wauc['theft_vicoffy']:.3f}"
+theft_ols_top    = f"{ols_top1k_w('Theft'):,}"
+theft_ols_top_uw = f"{ols_top1k_uw('Theft'):,}"
+
+burg_ols_auc     = f"{ols_auc_vals['Burglary']:.3f}"
+burg_ols_wauc    = f"{ols_wauc['burglary_vicoffy']:.3f}"
+burg_ols_top     = f"{ols_top1k_w('Burglary'):,}"
+burg_ols_top_uw  = f"{ols_top1k_uw('Burglary'):,}"
+
+mvt_ols_auc      = f"{ols_auc_vals['Motor Vehicle Theft']:.3f}"
+mvt_ols_wauc     = f"{ols_wauc['mvtheft_vicoffy']:.3f}"
+mvt_ols_top      = f"{ols_top1k_w('Motor Vehicle Theft'):,}"
+mvt_ols_top_uw   = f"{ols_top1k_uw('Motor Vehicle Theft'):,}"
+```
+
 ## Deviation from Pre-Registration
 
 This document reports results for individual-level property crime prediction models evaluated on a held-out period. The original pre-registration specified individual-level
@@ -114,21 +188,31 @@ The present analysis reflects the same analytical framework specified by the pre
 tick_num = [i / 10 for i in range(11)]
 tick_lab = [f"{i/10:.1f}" for i in range(11)]
 
-fig, ax = plt.subplots(figsize=(7, 7))
-ax.plot([0, 1], [0, 1], color="grey", lw=1, linestyle="--", label="Chance (AUC = 0.50)")
-ax.set_xlim([-0.02, 1.02]); ax.set_ylim([-0.02, 1.02])
-ax.set_xticks(tick_num); ax.set_xticklabels(tick_lab)
-ax.set_yticks(tick_num); ax.set_yticklabels(tick_lab)
-ax.set_xlabel("False Positive Rate"); ax.set_ylabel("True Positive Rate")
-ax.set_title("ROC Curves — Denver Property Crime Models (Holdout)")
-ax.set_aspect("equal")
+def _roc_axes(ax, title):
+    ax.plot([0, 1], [0, 1], color="grey", lw=1, linestyle="--", label="Chance (AUC = 0.50)")
+    ax.set_xlim([-0.02, 1.02]); ax.set_ylim([-0.02, 1.02])
+    ax.set_xticks(tick_num); ax.set_xticklabels(tick_lab)
+    ax.set_yticks(tick_num); ax.set_yticklabels(tick_lab)
+    ax.set_xlabel("False Positive Rate"); ax.set_ylabel("True Positive Rate")
+    ax.set_title(title); ax.set_aspect("equal")
+
+fig, (ax_ml, ax_ols) = plt.subplots(1, 2, figsize=(14, 7))
+
+_roc_axes(ax_ml,  "ROC Curves — ML Models (Holdout)")
+_roc_axes(ax_ols, "ROC Curves — OLS Baseline (Holdout)")
 
 for (label, df), color in zip(preds.items(), COLORS):
     fpr, tpr, _ = roc_curve(df["y_bin"], df["prob"])
-    ax.plot(fpr, tpr, lw=2, color=color,
-            label=f"{label}  (AUC = {auc_vals[label]:.3f})")
+    ax_ml.plot(fpr, tpr, lw=2, color=color,
+               label=f"{label}  (AUC = {auc_vals[label]:.3f})")
 
-ax.legend(loc="lower right")
+for (label, df), color in zip(ols_preds.items(), COLORS):
+    fpr, tpr, _ = roc_curve(df["y_bin"], df["prob"])
+    ax_ols.plot(fpr, tpr, lw=2, color=color,
+                label=f"{label}  (AUC = {ols_auc_vals[label]:.3f})")
+
+ax_ml.legend(loc="lower right")
+ax_ols.legend(loc="lower right")
 plt.tight_layout()
 plt.show()
 ```
@@ -136,7 +220,7 @@ plt.show()
 ## Calibration Plots
 
 ```{python}
-fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 fig.suptitle("Calibration — Denver Property Crime Models (Holdout)", fontsize=14)
 
 for ax, (label, df), color in zip(axes.flatten(), preds.items(), COLORS):
@@ -150,7 +234,8 @@ for ax, (label, df), color in zip(axes.flatten(), preds.items(), COLORS):
             linestyle="--", lw=1.8, label="Predicted")
     ax.plot(agg["Bin"], agg["Actual"], marker="o", color=color,
             linestyle="-",  lw=1.8, markeredgecolor="w", label="Actual")
-    ax.set_title(label); ax.set_xlim([0, BINS + 1])
+    ax.set_title(f"{label}\n{MODEL_INFO.get(label, '')}", fontsize=11)
+    ax.set_xlim([0, BINS + 1])
     ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Probability")
     ax.legend(loc="upper left", fontsize=10)
 
@@ -159,12 +244,10 @@ plt.show()
 ```
 
 ```{python}
-fig, ax = plt.subplots(figsize=(9, 5))
-ax.set_title("Calibration by Decile — All Models")
-ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Probability")
-ax.set_xlim([0, BINS + 1])
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+fig.suptitle("Calibration — OLS Baseline Models (Holdout)", fontsize=14)
 
-for (label, df), color in zip(preds.items(), COLORS):
+for ax, (label, df), color in zip(axes.flatten(), ols_preds.items(), COLORS):
     tmp = df.copy()
     tmp["Count"] = 1
     tmp["Bin"] = pd.qcut(tmp["prob"], BINS, labels=range(BINS)).astype(int) + 1
@@ -172,12 +255,14 @@ for (label, df), color in zip(preds.items(), COLORS):
     agg["Predicted"] = agg["prob"]  / agg["Count"]
     agg["Actual"]    = agg["y_bin"] / agg["Count"]
     ax.plot(agg["Bin"], agg["Predicted"], marker="+", color=color,
-            linestyle="--", lw=1.5, alpha=0.8)
+            linestyle="--", lw=1.8, label="Predicted")
     ax.plot(agg["Bin"], agg["Actual"], marker="o", color=color,
-            linestyle="-",  lw=1.5, markeredgecolor="w", label=label)
+            linestyle="-",  lw=1.8, markeredgecolor="w", label="Actual")
+    ax.set_title(f"{label}\nOLS  |  Platt-scaled", fontsize=11)
+    ax.set_xlim([0, BINS + 1])
+    ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Probability")
+    ax.legend(loc="upper left", fontsize=10)
 
-ax.legend(title="Model  (solid = Actual, dashed = Predicted)",
-          loc="upper left", fontsize=9)
 plt.tight_layout()
 plt.show()
 ```
@@ -192,15 +277,15 @@ held-out period to predict victim-weighted aggregate property crime, theft, moto
 ```{python}
 #| echo: false
 display(Markdown(f"""
-| Metric | Value |
-|:---|---:|
-| Holdout N | {n_fmt} |
-| Base rate | {prop_prate} positive |
-| Standard AUC | {prop_auc} |
-| Weighted AUC (tuning criterion) | {prop_wauc} |
-| Top-1,000 capture (victim-weighted) | {prop_top} events |
-| Top-1,000 capture (unweighted cells) | {prop_top_uw} individuals with ≥1 event |
-| Expected under random (unweighted) | ~{prop_rand} individuals |
+| Metric | ML Model | OLS |
+|:---|---:|---:|
+| Holdout N | {n_fmt} | {n_fmt} |
+| Base rate | {prop_prate} positive | {prop_prate} positive |
+| Standard AUC | {prop_auc} | {prop_ols_auc} |
+| Weighted AUC (tuning criterion) | {prop_wauc} | {prop_ols_wauc} |
+| Top-1,000 capture (victim-weighted) | {prop_top} events | {prop_ols_top} events |
+| Top-1,000 capture (unweighted cells) | {prop_top_uw} with ≥1 event | {prop_ols_top_uw} with ≥1 event |
+| Expected under random (unweighted) | ~{prop_rand} | ~{prop_rand} |
 """))
 ```
 
@@ -213,15 +298,15 @@ frequent offenders better than chance and better than the field accepted rate le
 ```{python}
 #| echo: false
 display(Markdown(f"""
-| Metric | Value |
-|:---|---:|
-| Holdout N | {n_fmt} cells |
-| Base rate | {theft_prate} positive |
-| Standard AUC | {theft_auc} |
-| Weighted AUC (tuning criterion) | {theft_wauc} |
-| Top-1,000 capture (victim-weighted) | {theft_top} individuals |
-| Top-1,000 capture (unweighted cells) | {theft_top_uw} individuals with ≥1 event |
-| Expected under random (unweighted) | ~{theft_rand} individuals |
+| Metric | ML Model | OLS |
+|:---|---:|---:|
+| Holdout N | {n_fmt} cells | {n_fmt} cells |
+| Base rate | {theft_prate} positive | {theft_prate} positive |
+| Standard AUC | {theft_auc} | {theft_ols_auc} |
+| Weighted AUC (tuning criterion) | {theft_wauc} | {theft_ols_wauc} |
+| Top-1,000 capture (victim-weighted) | {theft_top} events | {theft_ols_top} events |
+| Top-1,000 capture (unweighted cells) | {theft_top_uw} with ≥1 event | {theft_ols_top_uw} with ≥1 event |
+| Expected under random (unweighted) | ~{theft_rand} | ~{theft_rand} |
 """))
 ```
 
@@ -237,15 +322,15 @@ decile bins.
 ```{python}
 #| echo: false
 display(Markdown(f"""
-| Metric | Value |
-|:---|---:|
-| Holdout N | {n_fmt} cells |
-| Base rate | {burg_prate} positive |
-| Standard AUC | {burg_auc} |
-| Weighted AUC (tuning criterion) | {burg_wauc} |
-| Top-1,000 capture (victim-weighted) | {burg_top} individuals |
-| Top-1,000 capture (unweighted cells) | {burg_top_uw} individuals with ≥1 event |
-| Expected under random (unweighted) | ~{burg_rand} individuals |
+| Metric | ML Model | OLS |
+|:---|---:|---:|
+| Holdout N | {n_fmt} cells | {n_fmt} cells |
+| Base rate | {burg_prate} positive | {burg_prate} positive |
+| Standard AUC | {burg_auc} | {burg_ols_auc} |
+| Weighted AUC (tuning criterion) | {burg_wauc} | {burg_ols_wauc} |
+| Top-1,000 capture (victim-weighted) | {burg_top} events | {burg_ols_top} events |
+| Top-1,000 capture (unweighted cells) | {burg_top_uw} with ≥1 event | {burg_ols_top_uw} with ≥1 event |
+| Expected under random (unweighted) | ~{burg_rand} | ~{burg_rand} |
 """))
 ```
 
@@ -260,15 +345,15 @@ overdispersed nature of burglary data.
 ```{python}
 #| echo: false
 display(Markdown(f"""
-| Metric | Value |
-|:---|---:|
-| Holdout N | {n_fmt} cells |
-| Base rate | {mvt_prate} positive |
-| Standard AUC | {mvt_auc} |
-| Weighted AUC (tuning criterion) | {mvt_wauc} |
-| Top-1,000 capture (victim-weighted) | {mvt_top} individuals |
-| Top-1,000 capture (unweighted cells) | {mvt_top_uw} individuals with ≥1 event |
-| Expected under random (unweighted) | ~{mvt_rand} individuals |
+| Metric | ML Model | OLS |
+|:---|---:|---:|
+| Holdout N | {n_fmt} cells | {n_fmt} cells |
+| Base rate | {mvt_prate} positive | {mvt_prate} positive |
+| Standard AUC | {mvt_auc} | {mvt_ols_auc} |
+| Weighted AUC (tuning criterion) | {mvt_wauc} | {mvt_ols_wauc} |
+| Top-1,000 capture (victim-weighted) | {mvt_top} events | {mvt_ols_top} events |
+| Top-1,000 capture (unweighted cells) | {mvt_top_uw} with ≥1 event | {mvt_ols_top_uw} with ≥1 event |
+| Expected under random (unweighted) | ~{mvt_rand} | ~{mvt_rand} |
 """))
 ```
 
