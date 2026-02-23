@@ -3,6 +3,7 @@ title: "ROC and Calibration Plots — All Property Crime Models"
 format:
   html:
     toc: true
+    self-contained: true
 execute:
   echo: false
   warning: false
