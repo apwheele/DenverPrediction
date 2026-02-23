@@ -128,8 +128,7 @@ def get_data():
     # make new vars for property crime models
     prop_codes = [24,                           # MVT
         23, 21, 25, 27, 28, 51, 26, 58, 71, 63, # Theft
-        22,                                     # Burglary
-        20, 29, 72, 40, 41, 57, 73, 62, 70]     # Mischief
+        22]                                     # Burglary
     
     ent_data['property_off'] = (er.astype(int).isin(prop_codes)) * ent_data['off']
     ent_data['property_vic'] = (er.astype(int).isin(prop_codes)) * ent_data['vic']
@@ -139,11 +138,10 @@ def get_data():
     ent_data['theft_vicoff'] = ent_data['Theft'] * (ent_data['vic'] + ent_data['off'])
     ent_data['burglary_vicoff'] = ent_data['Burglary'] * (ent_data['vic'] + ent_data['off'])
     ent_data['mvtheft_vicoff'] = ent_data['MVTheft'] * (ent_data['vic'] + ent_data['off'])
-    ent_data['mischief_vicoff'] = ent_data['Mischief'] * (ent_data['vic'] + ent_data['off'])
 
     out_vars = ['violent_off','violent_vic','violent_vicoff', 'property_off',
                 'property_vic', 'property_vicoff', 'theft_vicoff', 'burglary_vicoff',
-                'mvtheft_vicoff', 'mischief_vicoff']
+                'mvtheft_vicoff']
     
     cvars = ['Murder', 'Rape', 'AggAssault', 'SimpAssault', 'MVTheft', 'Weapon', 
              'Theft', 'Burglary', 'Robbery', 'Mischief', 'Drugs', 'Other']
@@ -229,7 +227,7 @@ def get_data():
 
 y_vars = ['violent_offy','violent_vicy','violent_vicoffy', 'property_offy',
                 'property_vicy', 'property_vicoffy', 'theft_vicoffy', 'burglary_vicoffy',
-                'mvtheft_vicoffy', 'mischief_vicoffy']
+                'mvtheft_vicoffy']
 no_vars = ['pin','YEAR']
 
 if os.path.exists(train_data_path):

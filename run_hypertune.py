@@ -16,7 +16,12 @@ res_results = {}
 #####################################
 # setup
 
-y = 'property_vicoffy'
+# y = 'property_vicoffy'
+
+# alternate y vals for single prop crime models
+# y = 'theft_vicoffy'
+# y = 'burglary_vicoffy'
+y = 'mvtheft_vicoffy'
 k = 5
 k_folds = models.kfold_split(train_data, k, split='pin')
 
@@ -105,4 +110,4 @@ for m, t in res_results.items():
     })
 
 df = pd.DataFrame(output)
-df.to_csv("./output/tuning_results.csv", index=False)
+df.to_csv("./output/mvt_tuning_results.csv", index=False)
