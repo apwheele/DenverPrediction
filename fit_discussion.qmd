@@ -58,7 +58,7 @@ top1k     = dict(zip(all_met["y"], all_met["holdout_top1000_weight"].astype(int)
 prate     = dict(zip(all_met["y"], all_met["holdout_positive_rate"]))
 n_holdout = int(all_met["holdout_n"].iloc[0])
 
-preds = {label: pd.read_csv(path, usecols=["y_bin", "prob"])
+preds = {label: pd.read_csv(path, usecols=["y_bin", "prob", Y_KEYS[label]])
          for label, path in MODELS.items()}
 
 auc_vals = {label: roc_auc_score(df["y_bin"], df["prob"])
@@ -226,17 +226,18 @@ fig.suptitle("Calibration — Denver Property Crime Models (Holdout)", fontsize=
 for ax, (label, df), color in zip(axes.flatten(), preds.items(), COLORS):
     tmp = df.copy()
     tmp["Count"] = 1
+    y_col = Y_KEYS[label]
     tmp["Bin"] = pd.qcut(tmp["prob"], BINS, labels=range(BINS)).astype(int) + 1
-    agg = tmp.groupby("Bin", as_index=False)[["Count", "prob", "y_bin"]].sum()
+    agg = tmp.groupby("Bin", as_index=False)[["Count", "prob", y_col]].sum()
     agg["Predicted"] = agg["prob"]  / agg["Count"]
-    agg["Actual"]    = agg["y_bin"] / agg["Count"]
+    agg["Actual"]    = agg[y_col] / agg["Count"]
     ax.plot(agg["Bin"], agg["Predicted"], marker="+", color=color,
             linestyle="--", lw=1.8, label="Predicted")
     ax.plot(agg["Bin"], agg["Actual"], marker="o", color=color,
             linestyle="-",  lw=1.8, markeredgecolor="w", label="Actual")
     ax.set_title(f"{label}\n{MODEL_INFO.get(label, '')}", fontsize=11)
     ax.set_xlim([0, BINS + 1])
-    ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Probability")
+    ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Predicted Prob / Mean Victim Count")
     ax.legend(loc="upper left", fontsize=10)
 
 plt.tight_layout()
@@ -250,17 +251,18 @@ fig.suptitle("Calibration — OLS Baseline Models (Holdout)", fontsize=14)
 for ax, (label, df), color in zip(axes.flatten(), ols_preds.items(), COLORS):
     tmp = df.copy()
     tmp["Count"] = 1
+    y_col = Y_KEYS[label]
     tmp["Bin"] = pd.qcut(tmp["prob"], BINS, labels=range(BINS)).astype(int) + 1
-    agg = tmp.groupby("Bin", as_index=False)[["Count", "prob", "y_bin"]].sum()
+    agg = tmp.groupby("Bin", as_index=False)[["Count", "prob", y_col]].sum()
     agg["Predicted"] = agg["prob"]  / agg["Count"]
-    agg["Actual"]    = agg["y_bin"] / agg["Count"]
+    agg["Actual"]    = agg[y_col] / agg["Count"]
     ax.plot(agg["Bin"], agg["Predicted"], marker="+", color=color,
             linestyle="--", lw=1.8, label="Predicted")
     ax.plot(agg["Bin"], agg["Actual"], marker="o", color=color,
             linestyle="-",  lw=1.8, markeredgecolor="w", label="Actual")
     ax.set_title(f"{label}\nOLS  |  Platt-scaled", fontsize=11)
     ax.set_xlim([0, BINS + 1])
-    ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Probability")
+    ax.set_xlabel("Decile Bin (Low → High Risk)"); ax.set_ylabel("Predicted Prob / Mean Victim Count")
     ax.legend(loc="upper left", fontsize=10)
 
 plt.tight_layout()

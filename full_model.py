@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 import pandas as pd
 
@@ -127,6 +128,8 @@ for y, spec in DV_SPECS.items():
     # --------------------
     rm_full = make_rm(y, spec)
     rm_full.fit(train_data)
+    with open(os.path.join(dv_dir, "model.pkl"), "wb") as f:
+        pickle.dump(rm_full, f)
 
     holdout = holdout_base.copy()
     holdout["score"] = rm_full.predict(holdout)
@@ -158,6 +161,8 @@ for y, spec in DV_SPECS.items():
 
     cal = LogisticRegression(solver="lbfgs", max_iter=2000)
     cal.fit(oof[["score_oof"]].values, y_bin, sample_weight=sw_cal)
+    with open(os.path.join(dv_dir, "calibrator.pkl"), "wb") as f:
+        pickle.dump(cal, f)
 
     holdout["prob"] = cal.predict_proba(holdout[["score"]].values)[:, 1]
     holdout["y_bin"] = (holdout[y] > 0).astype(int)

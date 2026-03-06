@@ -1,3 +1,5 @@
+learning/
+
 # csv files with original data should not be uploaded
 
 *.csv

@@ -22,11 +22,13 @@ train_data_path = f'{t}/TrainData.csv.zip'
 holdout_data_path = f'{t}/HoldOutData.csv.zip'
 
 # Prepping data
-def get_data():
+def get_data(entity_files=None, incident_file=None):
+    if entity_files is None:
+        entity_files = [ent_old, ent_new]
+    if incident_file is None:
+        incident_file = inc_data
     # Prepping entity data
-    e1 = pd.read_csv(ent_old)
-    e2 = pd.read_csv(ent_new)
-    ent_data = pd.concat([e1,e2],ignore_index=True)
+    ent_data = pd.concat([pd.read_csv(f) for f in entity_files],ignore_index=True)
     ent_data['occ_date'] = pd.to_datetime(ent_data['occ_date'])
     # de-identifying starts here
     pin_ref = ent_data[['pin']].drop_duplicates().reset_index(drop=True).copy()
@@ -41,7 +43,7 @@ def get_data():
     # save out pin key
     pin_ref.to_csv(lookup_path, index=False)
     # Merging in XY from incident data
-    inc_d = pd.read_csv(inc_data)
+    inc_d = pd.read_csv(incident_file)
     # To check nibr codes
     nibr = inc_d.groupby(['ibr_code','offense_desc','ucr'],as_index=False).size()
     # getting centroid if spread out
