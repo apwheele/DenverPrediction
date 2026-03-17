@@ -178,7 +178,7 @@ for y, spec in DV_SPECS.items():
         c for c in other_dvs if c in holdout.columns and c != y
     ]
 
-    pred_path = os.path.join(dv_dir, "property_holdout_predictions.csv")
+    pred_path = os.path.join(dv_dir, f"{y}_holdout_predictions.csv")
     holdout[keep_cols].to_csv(pred_path, index=False)
 
     # --------------------

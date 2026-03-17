@@ -8,6 +8,7 @@ import os
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 np.random.seed(10)
 
@@ -169,7 +170,7 @@ def get_data(entity_files=None, incident_file=None):
             else:
                 cv_iv_li.append(cv_iv)
                 ent_data[cv_iv] = ent_data[cv]*ent_data[iv]
-    
+                
     last_date = ent_data['occ_date'].max()
     ld_m1 = last_date + pd.DateOffset(months=-12,days=1)
     ld_m1_st = ld_m1.strftime('%Y-%m-%d')

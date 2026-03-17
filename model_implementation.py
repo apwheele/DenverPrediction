@@ -1,6 +1,5 @@
 import os
 import pickle
-import numpy as np
 import pandas as pd
 
 
@@ -9,19 +8,28 @@ import pandas as pd
 ##############################################################################
 
 # this defines the locations for relevant items
+### for test runs, these are locations of actual data
+# ENTITY_FILES = [
+#       "./data/entity_data_2019to2022.csv",
+#       "./data/entity_data_2022topres.csv"
+#   ]
+# INCIDENT_FILE = "./data/incident_data_2019topres.csv"
+
 ENTITY_FILES = [                                     # entity file(s)
-    "./data/entity_data_1.csv",
-    "./data/entity_data_2.csv"
+    "./data/entity_data_file_1.csv",
+    "./data/entity_data_file_2.csv"
 ]
-INCIDENT_FILE = "./data/incident_data.csv"           # incident file(s)
+INCIDENT_FILE = "./data/incident_data_file.csv"           # incident file(s)
+
 FEATURES_PATH = "./data/prepped_data.csv"            # processed data if applicable, if not, location you want processed data to be saved
 LOOKUP_PATH = "./data/LookupTable.csv.zip"           # de-identified PIN back to PII key
 MODEL_DIR = "./output/final_model"                   # trained model
-OUTPUT_PATH = "./output/new_predictions/flagged.csv" # place you want the output
+OUTPUT_DIR = "./output/new_predictions/" # place you want the output
 
-# MODIFY THIS AS NEEDED
-# defines the pct of top persons of interest to identify
-TOP_N_PCT = 0.1
+
+# defines the prop or count of top persons of interest to identify
+TOP_PROP = None                     # Define proportion of interest, or set to None if you want a top N
+TOP_N = 100                         # Define number of interest, or set to None if you want a top proportion (includes ties, so output may be more than defined)
 
 # DVs of interest
 DV_NAMES = [
@@ -47,10 +55,10 @@ else:
 
 lookup = pd.read_csv(LOOKUP_PATH) # load in PII key
 
-os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)  # create output location if it doesnt already exist
+os.makedirs(OUTPUT_DIR, exist_ok=True)  # create output location if it doesnt already exist
 
 ##############################################################################
-# SCORING FOR TOP N% IDENTIFICATION FOR EACH DV
+# SCORING FOR TOP PROP IDENTIFICATION FOR EACH DV
 ##############################################################################
 
 for dv in DV_NAMES:
@@ -73,7 +81,7 @@ for dv in DV_NAMES:
 
 
 ##############################################################################
-# FLAGGING TOP N%
+# FLAGGING TOP PROP
 ##############################################################################
 
 flag_cols = []
@@ -83,18 +91,20 @@ for dv in DV_NAMES:
     if f"prob_{dv}" not in score_data.columns:
         continue
     flag_col = f"flag_{dv}"
-    threshold = score_data[prob_col].quantile(1 - TOP_N_PCT)
+    if TOP_N is None:
+        threshold = score_data[prob_col].quantile(1 - TOP_PROP)
+    else:
+        threshold = score_data[prob_col].nlargest(TOP_N).min()
+        
     score_data[flag_col] = score_data[prob_col] >= threshold
     flag_cols.append(flag_col)
-
-score_data["flagged_any"] = score_data[flag_cols].any(axis=1)
 
 
 ##############################################################################
 # JOIN PIN WITH PII FOR PRACTICAL USE
 ##############################################################################
 
-result = new_data.merge(
+result = score_data.merge(
     lookup,
     left_on="pin",      # de-identified PIN in the prediction model data
     right_on="pin_new", # de-identified PIN in the lookup table
@@ -107,6 +117,26 @@ result = result.rename(columns={
     "pin_y": "original_pin"
 })
 
-# save out results
-flagged = result[result["flagged_any"]].copy()
-flagged.to_csv(OUTPUT_PATH, index=False)
+##############################################################################
+# EXPORT ONE CSV PER DV
+##############################################################################
+
+for dv in DV_NAMES:
+    flag_col = f"flag_{dv}"
+    prob_col = f"prob_{dv}"
+    if flag_col not in result.columns:
+        continue
+
+    flagged = result[result[flag_col]].copy()
+
+    # sort by probability
+    flagged = flagged.sort_values(prob_col, ascending=False)
+
+    # put PIN first in outputs
+    cols = flagged.columns.tolist()
+    cols.insert(0, cols.pop(cols.index("original_pin")))
+    flagged = flagged[cols]
+
+    out_path = os.path.join(OUTPUT_DIR, f"{dv}_flagged.csv")
+    flagged.to_csv(out_path, index=False)
+    print(f"Saved {out_path} - {len(flagged)} persons flagged")
