@@ -35,24 +35,21 @@ matplotlib.rcParams.update({
     'axes.labelsize': 12, 'axes.titlesize': 14, 'figure.dpi': 100,
 })
 
-OUT_DIR = r"C:/Users/marc2/Dropbox/Crime De-Coder/DenverPrediction/output/final_model"
+OUT_DIR = "../output/final_model"
 
-MODELS = {
-    "Property Crime":      f"{OUT_DIR}/property_holdout_predictions.csv",
-    "Theft":               f"{OUT_DIR}/theft_holdout_predictions.csv",
-    "Burglary":            f"{OUT_DIR}/burglary_holdout_predictions.csv",
-    "Motor Vehicle Theft": f"{OUT_DIR}/mvt_holdout_predictions.csv",
-}
+
 Y_KEYS = {
     "Property Crime":      "property_vicoffy",
     "Theft":               "theft_vicoffy",
     "Burglary":            "burglary_vicoffy",
     "Motor Vehicle Theft": "mvtheft_vicoffy",
 }
+MODELS = {label: f"{OUT_DIR}/{y}/{y}_holdout_predictions.csv"
+            for label, y in Y_KEYS.items()}
 COLORS = ["#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
 BINS   = 10
 
-all_met   = pd.read_csv(f"{OUT_DIR}/all_metrics.csv")
+all_met   = pd.read_csv(f"{OUT_DIR}/model_metrics.csv")
 wauc      = dict(zip(all_met["y"], all_met["holdout_weighted_auc"]))
 top1k     = dict(zip(all_met["y"], all_met["holdout_top1000_weight"].astype(int)))
 prate     = dict(zip(all_met["y"], all_met["holdout_positive_rate"]))
@@ -124,12 +121,8 @@ mvt_top_uw   = f"{top1k_uw('Motor Vehicle Theft'):,}"
 
 ```{python}
 OLS_DIR = f"{OUT_DIR}/ols_outputs"
-OLS_MODELS = {
-    "Property Crime":      f"{OLS_DIR}/property_ols_holdout_predictions.csv",
-    "Theft":               f"{OLS_DIR}/theft_ols_holdout_predictions.csv",
-    "Burglary":            f"{OLS_DIR}/burglary_ols_holdout_predictions.csv",
-    "Motor Vehicle Theft": f"{OLS_DIR}/mvt_ols_holdout_predictions.csv",
-}
+OLS_MODELS = {label: f"{OLS_DIR}/{y}_ols_holdout_predictions.csv"
+                for label, y in Y_KEYS.items()}
 
 # Load OLS predictions including raw y column for top-k calculations
 ols_preds = {}

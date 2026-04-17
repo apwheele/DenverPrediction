@@ -12,22 +12,21 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 np.random.seed(10)
 
-d = './data'
-ent_old = f'{d}/entity_data_2019to2022.csv'
-ent_new = f'{d}/entity_data_2022topres.csv'
-inc_data = f'{d}/incident_data_2019topres.csv'
-lookup_path = f'{d}/LookupTable.csv.zip'
-
-t = './train_data'
-train_data_path = f'{t}/TrainData.csv.zip'
-holdout_data_path = f'{t}/HoldOutData.csv.zip'
+DEFAULT_ENTITY_FILES  = ['./data/entity_data_2019to2022.csv',
+                           './data/entity_data_2022topres.csv']
+DEFAULT_INCIDENT_FILE = './data/incident_data_2019topres.csv'
+DEFAULT_LOOKUP_PATH   = './data/LookupTable.csv.zip'
+DEFAULT_TRAIN_CACHE   = './train_data/TrainData.csv.zip'
+DEFAULT_HOLDOUT_CACHE = './train_data/HoldOutData.csv.zip'
 
 # Prepping data
-def get_data(entity_files=None, incident_file=None):
+def get_data(entity_files=None, incident_file=None, lookup_path=None):
     if entity_files is None:
-        entity_files = [ent_old, ent_new]
+        entity_files = DEFAULT_ENTITY_FILES
     if incident_file is None:
-        incident_file = inc_data
+        incident_file = DEFAULT_INCIDENT_FILE
+    if lookup_path is None:
+        lookup_path = DEFAULT_LOOKUP_PATH
     # Prepping entity data
     ent_data = pd.concat([pd.read_csv(f) for f in entity_files],ignore_index=True)
     ent_data['occ_date'] = pd.to_datetime(ent_data['occ_date'])
@@ -233,28 +232,31 @@ y_vars = ['violent_offy','violent_vicy','violent_vicoffy', 'property_offy',
                 'mvtheft_vicoffy']
 no_vars = ['pin','YEAR']
 
-if os.path.exists(train_data_path):
-    train_data = pd.read_csv(train_data_path)
-    holdout_data = pd.read_csv(holdout_data_path)
-else:
-    train_data, holdout_data = get_data()
-    train_data.to_csv(train_data_path,index=False)
-    holdout_data.to_csv(holdout_data_path,index=False)
-
-x_vars = list(set(list(train_data)) - set(y_vars + no_vars))
-
-# 19,20,21 ~ 22
-# 20,21,22 ~ 23
-# 21,22,23 ~ 24
-# 25 all hold out
-
-# Prior 3 years
-# Prior year
-# Prior 6 months
-
-
-
-
-
-
-
+def load_train_holdout(entity_files=None, incident_file=None,
+                        lookup_path=None,
+                        train_cache=DEFAULT_TRAIN_CACHE,
+                        holdout_cache=DEFAULT_HOLDOUT_CACHE,
+                        rebuild=False):
+    """Load (or rebuild) the prepped train/holdout sets and return
+    (train_data, holdout_data, x_vars)."""
+    use_cache = (not rebuild
+                and train_cache and holdout_cache
+                and os.path.exists(train_cache)
+                and os.path.exists(holdout_cache))
+    if use_cache:
+        train_data = pd.read_csv(train_cache)
+        holdout_data = pd.read_csv(holdout_cache)
+    else:
+        train_data, holdout_data = get_data(
+            entity_files=entity_files,
+            incident_file=incident_file,
+            lookup_path=lookup_path,
+        )
+        if train_cache:
+            os.makedirs(os.path.dirname(train_cache), exist_ok=True)
+            train_data.to_csv(train_cache, index=False)
+        if holdout_cache:
+            os.makedirs(os.path.dirname(holdout_cache), exist_ok=True)
+            holdout_data.to_csv(holdout_cache, index=False)
+    x_vars = list(set(list(train_data)) - set(y_vars + no_vars))
+    return train_data, holdout_data, x_vars
