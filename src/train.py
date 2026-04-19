@@ -114,7 +114,7 @@ def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, inc
             tr = train_data[k_folds != fold].reset_index(drop=True)
             te_idx = np.where(k_folds == fold)[0]
             te = train_data.iloc[te_idx].reset_index(drop=True)
-            rm_fold = make_rm(y, spec)
+            rm_fold = make_rm(y, spec, x_vars)
             rm_fold.fit(tr)
             oof.loc[te_idx, "score_oof"] = rm_fold.predict(te).values
 

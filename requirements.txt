@@ -14,4 +14,5 @@ patsy
 plotnine
 jupyter
 optuna
+docx2pdf
 # also requires installing quarto

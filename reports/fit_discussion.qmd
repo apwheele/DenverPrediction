@@ -50,10 +50,11 @@ COLORS = ["#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
 BINS   = 10
 
 all_met   = pd.read_csv(f"{OUT_DIR}/model_metrics.csv")
-wauc      = dict(zip(all_met["y"], all_met["holdout_weighted_auc"]))
-top1k     = dict(zip(all_met["y"], all_met["holdout_top1000_weight"].astype(int)))
-prate     = dict(zip(all_met["y"], all_met["holdout_positive_rate"]))
-n_holdout = int(all_met["holdout_n"].iloc[0])
+gbm_met   = all_met[all_met["model"] != "ols_regressor"]
+wauc      = dict(zip(gbm_met["y"], gbm_met["holdout_weighted_auc"]))
+top1k     = dict(zip(gbm_met["y"], gbm_met["holdout_top1000_weight"].astype(int)))
+prate     = dict(zip(gbm_met["y"], gbm_met["holdout_positive_rate"]))
+n_holdout = int(gbm_met["holdout_n"].iloc[0])
 
 preds = {label: pd.read_csv(path, usecols=["y_bin", "prob", Y_KEYS[label]])
          for label, path in MODELS.items()}
@@ -64,7 +65,7 @@ auc_vals = {label: roc_auc_score(df["y_bin"], df["prob"])
 # Build model name + hyperparameter strings for calibration plot titles
 _y_to_label = {v: k for k, v in Y_KEYS.items()}
 MODEL_INFO = {}
-for _, row in all_met.iterrows():
+for _, row in gbm_met.iterrows():
     params = ast.literal_eval(row["best_params"])
     label  = _y_to_label.get(row["y"], row["y"])
     m      = row["model"]
@@ -133,7 +134,7 @@ for label, path in OLS_MODELS.items():
 ols_auc_vals = {label: roc_auc_score(df["y_bin"], df["prob"])
                 for label, df in ols_preds.items()}
 
-ols_met  = pd.read_csv(f"{OLS_DIR}/ols_metrics.csv")
+ols_met = all_met[all_met["model"] == "ols_regressor"]
 ols_wauc = dict(zip(ols_met["y"], ols_met["holdout_weighted_auc"]))
 
 def ols_top1k_w(label):
@@ -284,9 +285,9 @@ display(Markdown(f"""
 """))
 ```
 
-The aggregate property crime model achieves a standard AUC of `{python} prop_auc` and
+<!-- The aggregate property crime model achieves a standard AUC of `{python} prop_auc` and
 a weighted AUC of `{python} prop_wauc`, indicating that the model can distinguish
-frequent offenders better than chance and better than the field accepted rate level of 0.7. The model successfully identfies 433 of the top 1000 individuals, far more than the `{python} prop_rand` expected under random allocation, and resulting in coverage of `{python} prop_top` property crime events. Because it aggregates all subtypes, this model provides the broadest spatial signal and as models progress into less frequent property crime subtypes, models' predictive capabilities 
+frequent offenders better than chance and better than the field accepted rate level of 0.7. The model successfully identfies 433 of the top 1000 individuals, far more than the `{python} prop_rand` expected under random allocation, and resulting in coverage of `{python} prop_top` property crime events. Because it aggregates all subtypes, this model provides the broadest spatial signal and as models progress into less frequent property crime subtypes, models' predictive capabilities  -->
 
 ### Theft
 
@@ -305,11 +306,11 @@ display(Markdown(f"""
 """))
 ```
 
-Theft produces the highest weighted AUC (`{python} theft_wauc`) of the individual
+<!-- Theft produces the highest weighted AUC (`{python} theft_wauc`) of the individual
 subtype models, consistent with theft being the most spatially concentrated property
 crime category and therefore most amenable to predictive targeting. The theft model identified 346 individuals in the top 1000, far more than the 17 expected by random chance, offering coverage of 1901 theft events in the sample space. Further, the calibration
 plot shows reasonable agreement between predicted probabilities and observed rates across
-decile bins.
+decile bins. -->
 
 
 ### Burglary
@@ -329,11 +330,11 @@ display(Markdown(f"""
 """))
 ```
 
-Burglary is the rarest subtype in this study area (`{python} burg_prate` positive rate).
+<!-- Burglary is the rarest subtype in this study area (`{python} burg_prate` positive rate).
 Despite the low base rate, the model recovers a weighted AUC of `{python} burg_wauc`,
 demonstrating that meaningful spatial signal is recoverable even for infrequent events.
 The Poisson loss function used during training is appropriate for the count-based,
-overdispersed nature of burglary data.
+overdispersed nature of burglary data. -->
 
 ### Motor Vehicle Theft
 
@@ -352,12 +353,12 @@ display(Markdown(f"""
 """))
 ```
 
-Motor vehicle theft yields the lowest weighted AUC (`{python} mvt_wauc`) among the
+<!-- Motor vehicle theft yields the lowest weighted AUC (`{python} mvt_wauc`) among the
 four models, suggesting that spatial patterns for vehicle theft are more diffuse or
 temporally unstable compared to the other subtypes. This is consistent with
-its level of occurrence in the sample space, seeing a base rate of only 0.67\%.
+its level of occurrence in the sample space, seeing a base rate of only 0.67\%. -->
 
-### Summary
+<!-- ### Summary
 All four models perform above the random-chance baseline (AUC = 0.50), as well as the field-accepted quality threshold of AUC = 0.7. However, per the specifications of the preregistration, only the total property crime and theft models successfully identified over 200 individuals in the top 1000, rendering the burglary and motor vehicle theft models unsuccessful. While this does not necessarily mean these outcomes are not worth further modeling, this may speak to the simple infrequency of burglary and motor vehicle theft in the sample space. With base rates of 0.55\% and 0.67\%, respectively, it is possible that in order to reach the threshold of 200, models would need to consistently identify one-time offenders or victims.
 
-This points to an identified struggle for machine learning models when dealing with infrequent outcomes: predictive value of a model is inherently bounded the actual rate of the outcome (Wheeler, Worden & Silver, 2019). The infrequent nature of motor vehicle theft and burglary not only requires models to identify single-instance offenders or victims at a higher rate, who may be notably more difficult to predict than those with higher offender/victim counts, even in the midst of an extremely high AUC, we encounter the issue of Bayes' theorem, where positives produced by the model become more likely to be false, not as a shortcoming of the model, but as an artifact of the underlying prevalence in the population. Therefore, at this stage of the analysis, we recommend that implenetation of models remains within total property crime and theft outcomes, allowing for further methdological inquiry into modeling of burgalry and motor vehicle theft.
+This points to an identified struggle for machine learning models when dealing with infrequent outcomes: predictive value of a model is inherently bounded the actual rate of the outcome (Wheeler, Worden & Silver, 2019). The infrequent nature of motor vehicle theft and burglary not only requires models to identify single-instance offenders or victims at a higher rate, who may be notably more difficult to predict than those with higher offender/victim counts, even in the midst of an extremely high AUC, we encounter the issue of Bayes' theorem, where positives produced by the model become more likely to be false, not as a shortcoming of the model, but as an artifact of the underlying prevalence in the population. Therefore, at this stage of the analysis, we recommend that implenetation of models remains within total property crime and theft outcomes, allowing for further methdological inquiry into modeling of burgalry and motor vehicle theft. -->

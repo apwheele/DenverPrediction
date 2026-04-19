@@ -34,4 +34,4 @@ if HYPERTUNE:
     for y in DV_SPECS:
         run_hypertune(y, train_data, x_vars, k_folds, out_csv=f"./output/{y}_tuning_results.csv")
 else:
-    train_all(train_data, holdout_data, x_vars, "./output/final_model")
+    train_all(train_data, holdout_data, x_vars, "./output/final_model", include_ols=True)

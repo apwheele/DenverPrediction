@@ -60,12 +60,25 @@ To re-run hyperparameter tuning before fitting the final models, set `HYPERTUNE 
 Flagged CSVs (one per DV) land in `./output/new_predictions/`.
 
 ## Reports
-                                                                                                                                
+
+**Before running, edit the activation line in `render_report.bat`** to point at your own environment. The committed script activates a local `venv`:
+
+```bat
+call "..\venv\Scripts\activate.bat"
+```
+
+Replace with whatever activates your environment, e.g.:
+
+- Conda: `call C:\path\to\conda\Scripts\activate.bat` then `call conda activate <env-name>`
+- A venv elsewhere: `call C:\path\to\your\venv\Scripts\activate.bat`
+
 Quarto reports live in `reports/`. To render `fit_discussion.qmd` to Word and PDF on a Windows machine with conda, quarto, and Microsoft Word installed:
 
     reports\render_report.bat
 
-The script activates a conda environment, renders the `.qmd` to `.docx`, then converts the `.docx` to `.pdf`.
+The script renders the `.qmd` to `.docx`, then converts the `.docx` to `.pdf`. The report will generate model fit and prediction accuracy statistics against and OLS baseline.
+
+
 
 ### First-time setup
 
