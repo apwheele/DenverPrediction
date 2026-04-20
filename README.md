@@ -78,17 +78,6 @@ Quarto reports live in `reports/`. To render `fit_discussion.qmd` to Word and PD
 
 The script renders the `.qmd` to `.docx`, then converts the `.docx` to `.pdf`. The report will generate model fit and prediction accuracy statistics against and OLS baseline.
 
-
-
-### First-time setup
-
-Open `reports\render_report.bat` in a text editor and update two lines to match your local machine:
-
-    set conda_act=D:\Python\Scripts\activate.bat   :: path to your conda activate.bat
-    call conda activate crimscrape                 :: your conda environment name
-
-Everything else in the `.bat` should work as-is.
-
 ### Requirements
 
     - [quarto](https://quarto.org/) installed and on your PATH
