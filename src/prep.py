@@ -12,23 +12,11 @@ warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 np.random.seed(10)
 
-DEFAULT_ENTITY_FILES  = ['./data/entity_data_2019to2022.csv',
-                           './data/entity_data_2022topres.csv']
-DEFAULT_INCIDENT_FILE = './data/incident_data_2019topres.csv'
-DEFAULT_LOOKUP_PATH   = './data/LookupTable.csv.zip'
-DEFAULT_TRAIN_CACHE   = './train_data/TrainData.csv.zip'
-DEFAULT_HOLDOUT_CACHE = './train_data/HoldOutData.csv.zip'
 
 # Prepping data
-def get_data(entity_files=None, incident_file=None, lookup_path=None):
-    if entity_files is None:
-        entity_files = DEFAULT_ENTITY_FILES
-    if incident_file is None:
-        incident_file = DEFAULT_INCIDENT_FILE
-    if lookup_path is None:
-        lookup_path = DEFAULT_LOOKUP_PATH
+def get_data(entity_df, incident_df, predict_only=False):
     # Prepping entity data
-    ent_data = pd.concat([pd.read_csv(f) for f in entity_files],ignore_index=True)
+    ent_data = entity_df.copy()
     ent_data['occ_date'] = pd.to_datetime(ent_data['occ_date'])
     # de-identifying starts here
     pin_ref = ent_data[['pin']].drop_duplicates().reset_index(drop=True).copy()
@@ -40,10 +28,8 @@ def get_data(entity_files=None, incident_file=None, lookup_path=None):
     ent_data = ent_data.merge(pin_ref, on='pin', how='left')
     ent_data['pin'] = ent_data['pin_new']
     ent_data = ent_data.drop(columns=['pin_new'])
-    # save out pin key
-    pin_ref.to_csv(lookup_path, index=False)
     # Merging in XY from incident data
-    inc_d = pd.read_csv(incident_file)
+    inc_d = incident_df.copy()
     # To check nibr codes
     nibr = inc_d.groupby(['ibr_code','offense_desc','ucr'],as_index=False).size()
     # getting centroid if spread out
@@ -184,7 +170,7 @@ def get_data(entity_files=None, incident_file=None, lookup_path=None):
         return gs
     
     # Getting past 3, past 1, and past 6 months
-    def base_date(end):
+    def base_date(end, include_y=True):
         # getting X variables
         ed = pd.to_datetime(end)
         ey = int(end[:4])
@@ -194,20 +180,30 @@ def get_data(entity_files=None, incident_file=None, lookup_path=None):
         gs1 = get_x(b1,end,'p1')
         b6m = (ed - pd.DateOffset(months=6)).strftime('%Y-%m-%d')
         gs6m = get_x(b6m,end,'6m')
-        # getting the Y variable, 1 year in future
-        y1f = (ed + pd.DateOffset(months=12)).strftime('%Y-%m-%d')
-        year_out = y1f[:4]
-        outV = get_x(end,y1f,'y',vs=out_vars)
         # merging all together
         gsc = pd.merge(gs3,gs1,on='pin',how='outer')
         gsc = pd.merge(gsc,gs6m,on='pin',how='outer')
+        if include_y:
+            # getting the Y variable, 1 year in future
+            y1f = (ed + pd.DateOffset(months=12)).strftime('%Y-%m-%d')
+            outV = get_x(end,y1f,'y',vs=out_vars)
+            gsc = pd.merge(gsc,outV,on='pin',how='left') #indicator='merge_type'
         # For outcome, only want those known to the police prior in some capacity
-        gsc = pd.merge(gsc,outV,on='pin',how='left') #indicator='merge_type'
         # setting to ints and filling with zero
         int_vars = list(set(list(gsc)) - set(['merge_type']))
         gsc[int_vars] = gsc[int_vars].fillna(0).astype(int)
         return gsc
     
+    nk_vars = ['no_keepp3', 'no_keepp1', 'no_keep6m']
+
+    if predict_only:
+        last_date_str = last_date.strftime('%Y-%m-%d')
+        score_data = base_date(last_date_str, include_y=False)
+        score_data['YEAR'] = int(last_date_str[:4])
+        score_data = score_data[score_data[nk_vars].sum(axis=1) == 0]
+        score_data.drop(columns=nk_vars, inplace=True)
+        return score_data, pin_ref
+
     f_d = []
     for b in base_dl:
         bd = base_date(b).copy()
@@ -218,45 +214,21 @@ def get_data(entity_files=None, incident_file=None, lookup_path=None):
     final_hold_out = base_date(ld_m1_st)
     
     # get rid of the no-keep variables
-    nk_vars = ['no_keepp3','no_keepp1','no_keep6m']
+    # nk_vars = ['no_keepp3','no_keepp1','no_keep6m']
     train_data = train_data[train_data[nk_vars].sum(axis=1) == 0]
     final_hold_out = final_hold_out[final_hold_out[nk_vars].sum(axis=1) == 0]
     train_data.drop(columns=nk_vars,inplace=True)
     final_hold_out.drop(columns=nk_vars,inplace=True)
     
     # Get rid of rows 
-    return train_data, final_hold_out
+    return train_data, final_hold_out, pin_ref
 
 y_vars = ['violent_offy','violent_vicy','violent_vicoffy', 'property_offy',
                 'property_vicy', 'property_vicoffy', 'theft_vicoffy', 'burglary_vicoffy',
                 'mvtheft_vicoffy']
 no_vars = ['pin','YEAR']
 
-def load_train_holdout(entity_files=None, incident_file=None,
-                        lookup_path=None,
-                        train_cache=DEFAULT_TRAIN_CACHE,
-                        holdout_cache=DEFAULT_HOLDOUT_CACHE,
-                        rebuild=False):
-    """Load (or rebuild) the prepped train/holdout sets and return
-    (train_data, holdout_data, x_vars)."""
-    use_cache = (not rebuild
-                and train_cache and holdout_cache
-                and os.path.exists(train_cache)
-                and os.path.exists(holdout_cache))
-    if use_cache:
-        train_data = pd.read_csv(train_cache)
-        holdout_data = pd.read_csv(holdout_cache)
-    else:
-        train_data, holdout_data = get_data(
-            entity_files=entity_files,
-            incident_file=incident_file,
-            lookup_path=lookup_path,
-        )
-        if train_cache:
-            os.makedirs(os.path.dirname(train_cache), exist_ok=True)
-            train_data.to_csv(train_cache, index=False)
-        if holdout_cache:
-            os.makedirs(os.path.dirname(holdout_cache), exist_ok=True)
-            holdout_data.to_csv(holdout_cache, index=False)
+def load_train_holdout(entity_df, incident_df):
+    train_data, holdout_data, lookup = get_data(entity_df, incident_df)
     x_vars = list(set(list(train_data)) - set(y_vars + no_vars))
-    return train_data, holdout_data, x_vars
+    return train_data, holdout_data, x_vars, lookup

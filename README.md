@@ -19,45 +19,48 @@ The data is sensitive, so only the aggregated data is uploaded. The original uni
 
 ## Usage
 
-The only two files needed to operate the model in this repository are: 
+The file needed to operate the model in this repository is: 
 
-    train_model.py
     predict.py
 
 ## Data
 
-All raw input data lives in `./data/`. The pipeline expects three kinds of files:
+All raw input data used to make the model lives in `./data/`. The pipeline expects three kinds of files:
 
-1. **Entity files** — person-level records (one or more CSVs). Must include at minimum: `pin`, `occ_date`, `role`, `ucr`, `incident_no`.
-2. **Incident file** — incident-level records (one CSV). Must include: `incident_no`, `x_coordinate`, `y_coordinate`, `ibr_code`, `offense_desc`, `ucr`.
+1. **Entity files** — person-level records. Must include at minimum: `pin`, `occ_date`, `role`, `ucr`, `incident_no`.
+2. **Incident file** — incident-level records. Must include: `incident_no`, `x_coordinate`, `y_coordinate`, `ibr_code`, `offense_desc`, `ucr`.
 3. **Lookup table** — `./data/LookupTable.csv.zip`, mapping the de-identified `pin` used in modeling back to the original PII identifier. This is generated **automatically** by the data prep on first run; you don't need to create it yourself.
 
 The outcome (DV) columns (`property_vicoffy`, `theft_vicoffy`, `burglary_vicoffy`, `mvtheft_vicoffy`) are created from UCR codes and role categories in `src/prep.py`, so their names stay stable across datasets. If your incoming data has roles or UCR codes that aren't mapped, prep will print a warning, and then proceed.
 
-### Training on new data
+### Using the model with new data
 
-1. Put your entity and incident level data CSVs in `./data/`.
-2. Open `train_model.py` and edit `ENTITY_FILES` and `INCIDENT_FILE` to match your filenames.
-3. Set `REBUILD = True` so the prepped data in `./train_data/` get rebuilt from your new raw files.
-4. Run:
+1. Point the `predict.py` file at entity and incident level data. Pandas dfs are accepted as well as csvs
+2. Modify the function's arguments according to preferences, below are the default arguments:
+                
+                run(entity_df, incident_df,
+                        dv_names=("property_vicoffy", "burglary_vicoffy",
+                                "mvtheft_vicoffy", "theft_vicoffy"),
+                        train=False,
+                        forward=False,
+                        model_dir="./output/final_model",
+                        hypertune=False,
+                        include_ols=False)
+
+    - DV names are created from the data prep embedded in the function, the argument can be subsetted to model only select outcomes
+    - When train=False, the model is based on its initial construction. Users can set this arg to True to retrain on new input data
+    - The forward=False argument toggles whether the model should predict on holdout data or the future. Default is False so users can investigate model validity against actual values of a given variable
+    - When train=False, this argument defines where the specs for the model being implemented live. The default location are the models trained as a part of the model's initial construction. If train=True and the model_dir is left with its default, the newly trained models will overwrite the older model cache and become the new default
+    - The hypertune=False argument avoids the ~12 hour model parameter invesitgation. These parameters are already defined from initial hypertuning.
+    - include_ols=False omits simple OLS models for comparison to more complex MLM models.
+
+                        
+3. Run:
     
     python train_model.py
     
-Trained models land in `./output/final_model/<dv>/`.
-
-To re-run hyperparameter tuning before fitting the final models, set `HYPERTUNE = True` in `train_model.py`. Tuning results are written to `./output/`; copy the best params into `DV_SPECS` in `src/train.py`, then re-run with `HYPERTUNE = False`. Note that the current models have already been hypertuned, and the hypertuning process will take a long time (~12 hours).
-
-### Predicting on new data
-
-1. Put your CSVs in `./data/` (or leave them as-is if you used the data for training)
-2. Open `predict.py` and edit `ENTITY_FILES` and `INCIDENT_FILE` to match your filenames.
-3. Set `REBUILD = True` so features get rebuilt from your new raw files.
-4. Optionally adjust `DV_NAMES`, `TOP_N`, or `TOP_PROP` according to preferences (set exactly one of the last two; leave the other `None`).
-5. Run:
-
-    python predict.py
-
-Flagged CSVs (one per DV) land in `./output/new_predictions/`.
+Newly trained model specs land in `./output/final_model/<dv>/`.
+Relevant outputs will be stored in a `predictions` object with the `prob_{dv}_vicoffy` column defining each PIN's probability of a given outcome.
 
 ## Reports
 

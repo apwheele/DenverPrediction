@@ -130,12 +130,6 @@ def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, inc
         holdout["y_bin"] = (holdout[y] > 0).astype(int)
         holdout["sw"] = np.clip(holdout[y].astype(float), 1, None)
 
-        base_cols = ["pin", "YEAR", y, "y_bin", "score", "prob", "sw"]
-        other_dvs = [c for c in dv_specs if c != y and c in holdout.columns]
-        keep_cols = [c for c in base_cols if c in holdout.columns] + other_dvs
-        pred_path = os.path.join(dv_dir, f"{y}_holdout_predictions.csv")
-        holdout[keep_cols].to_csv(pred_path, index=False)
-
         metrics_rows.append({
             "model": f"{spec['model_type'].lower()}_regressor",
             "y": y,
@@ -145,7 +139,6 @@ def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, inc
                 holdout.sort_values("score", ascending=False).head(1000)[y].sum()),
             "holdout_n": int(len(holdout)),
             "holdout_positive_rate": float((holdout[y] > 0).mean()),
-            "pred_path": pred_path,
         })
         print(f"[DONE] {y} | Holdout WeightedAUC: {wauc_holdout:.6f}")
 
@@ -154,9 +147,6 @@ def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, inc
                             os.path.join(out_dir, "ols_outputs"), metrics_rows, x_vars)
 
     metrics_df = pd.DataFrame(metrics_rows)
-    metrics_path = os.path.join(out_dir, "model_metrics.csv")
-    metrics_df.to_csv(metrics_path, index=False)
-    print("Saved combined metrics:", metrics_path)
     return metrics_df
 
 
@@ -184,13 +174,9 @@ def _fit_ols_baseline(y, train_data, holdout_base, k_folds, ols_dir, metrics_row
     holdout["y_bin"] = (holdout[y] > 0).astype(int)
     holdout["sw"] = np.clip(holdout[y].astype(float), 1, None)
 
-    out_path = os.path.join(ols_dir, f"{y}_ols_holdout_predictions.csv")
-    holdout[["pin", y, "y_bin", "score", "prob", "sw"]].to_csv(
-        out_path, index=False)
     metrics_rows.append({
         "model": "ols_regressor", "y": y, "best_params": "",
         "holdout_weighted_auc": wauc, "holdout_top1000_weight": np.nan,
         "holdout_n": int(len(holdout)),
         "holdout_positive_rate": float((holdout[y] > 0).mean()),
-        "pred_path": out_path,
     })

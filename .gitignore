@@ -13,7 +13,8 @@ ArnoldProposal/data_dictionary.docx
 ArnoldProposal/Incident_data.csv
 ArnoldProposal/Entity_data.csv
 
-# ignore misc and venv files
+# ignore test, misc and venv files
 misc/
 venv/
 .vscode/
+test.py
