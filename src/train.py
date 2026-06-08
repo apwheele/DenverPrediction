@@ -1,5 +1,6 @@
 import os
 import pickle
+import json
 import pandas as pd
 import numpy as np
 
@@ -11,35 +12,10 @@ from sklearn.metrics import roc_auc_score
 from src import models
 
 # params identified via hypertune
-DV_SPECS = {
-    "property_vicoffy": {
-        "model_type": "lgb",
-        "best_params": {"n_estimators": 209,
-                        "max_depth": 9,
-                        "min_data_in_leaf": 74},
-    },
-    "burglary_vicoffy": {
-        "model_type": "cat",
-        "best_params": {"n_estimators": 681,
-                        "max_depth": 10,
-                        "min_data_in_leaf": 83,
-                        "loss_function": "Poisson"},
-    },
-    "mvtheft_vicoffy": {
-        "model_type": "cat",
-        "best_params": {"n_estimators": 579,
-                        "max_depth": 10,
-                        "min_data_in_leaf": 83,
-                        "loss_function": "Poisson"},
-    },
-    "theft_vicoffy": {
-        "model_type": "cat",
-        "best_params": {"n_estimators": 871,
-                        "max_depth": 3,
-                        "min_data_in_leaf": 45,
-                        "loss_function": "RMSE"},
-    },
-}
+_SPECS_PATH = os.path.join(os.path.dirname(__file__), "..",
+                            "dv_specs.json")
+with open(_SPECS_PATH) as f:
+    DV_SPECS = json.load(f)
 
 def weighted_auc(y_count, score):
     y_count = np.asarray(y_count).astype(float)
@@ -80,7 +56,33 @@ def make_rm(y, spec, x_vars):
         raise ValueError(f"Unknown model_type: {spec['model_type']}")
     return models.Mod(ide_vars=x_vars, y=y, bin_y=False, mod=base)
 
-def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, include_ols=False):
+def train_all(train_data, holdout_data, x_vars, out_dir, k=5, split="pin", dv_specs=None, include_ols=False):
+    """
+    Train models on a specific dataset
+
+    Parameters
+    ----------
+    train_data: DataFrame
+            Training dataset
+    holdout_data: DataFrame
+            Testing dataset to be excluded from training
+    x_vars: list of str
+            Predictor columns
+    out_dir: str
+            location to store output files
+    k: int
+            Number of k-folds for training, default is 5
+    split: str
+            Grouping column so a group is never split across folds, this will (almost) always be pin
+    dv_specs: list of str
+            Outcome(s) of interest
+    include_ols: boolean
+            If True, OLS is also trainied for a baseline comparison
+
+    Returns
+    -------
+    DataFrame with model training specs to be used for implementation
+    """
     dv_specs = dv_specs or DV_SPECS
     os.makedirs(out_dir, exist_ok=True)
 
@@ -106,7 +108,7 @@ def train_all(train_data, holdout_data, x_vars, out_dir, k=5, dv_specs=None, inc
                                     holdout["score"].values)
         
         # Platt calibration
-        k_folds = models.kfold_split(train_data, k, split="pin")
+        k_folds = models.kfold_split(train_data, k, split=split)
         oof = train_data.copy().reset_index(drop=True)
         oof["score_oof"] = np.nan
 

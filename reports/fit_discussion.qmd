@@ -16,8 +16,8 @@ execute:
 ---
 
 ```{python}
-import sys
-sys.path.insert(0, r"C:/Users/marc2/Dropbox/Crime De-Coder/DenverPrediction")
+import sys, os
+sys.path.insert(0, os.path.abspath(".."))
 
 import ast
 import pandas as pd

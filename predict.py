@@ -17,5 +17,5 @@ incident_df = pd.read_csv("./data/incident_data_2019topres.csv")
 
 ##############################################################################
 
-# Score :
+# Predict:
 predictions = run(entity_df, incident_df, train=False)

@@ -11,7 +11,7 @@ Andrew Wheeler
 
 ## Replicating the environment
 
-I use conda and quarto. So to replicate the python environment see the `requirements.txt` file in the root. In addition to this, I use [quarto](https://quarto.org/), which that will also need to be installed to render the `.qmd` files.
+I use a standard Python venv and quarto. So to replicate the python environment see the `requirements.txt` file in the root. In addition to this, I use [quarto](https://quarto.org/), which that will also need to be installed to render the `.qmd` files.
 
 ## Data Released
 
@@ -57,7 +57,7 @@ The outcome (DV) columns (`property_vicoffy`, `theft_vicoffy`, `burglary_vicoffy
                         
 3. Run:
     
-    python train_model.py
+    python predict.py
     
 Newly trained model specs land in `./output/final_model/<dv>/`.
 Relevant outputs will be stored in a `predictions` object with the `prob_{dv}_vicoffy` column defining each PIN's probability of a given outcome.
@@ -75,7 +75,7 @@ Replace with whatever activates your environment, e.g.:
 - Conda: `call C:\path\to\conda\Scripts\activate.bat` then `call conda activate <env-name>`
 - A venv elsewhere: `call C:\path\to\your\venv\Scripts\activate.bat`
 
-Quarto reports live in `reports/`. To render `fit_discussion.qmd` to Word and PDF on a Windows machine with conda, quarto, and Microsoft Word installed:
+Quarto reports live in `reports/`. To render `fit_discussion.qmd` to Word and PDF on a Windows machine with a venv, quarto, and Microsoft Word installed:
 
     reports\render_report.bat
 
@@ -85,5 +85,5 @@ The script renders the `.qmd` to `.docx`, then converts the `.docx` to `.pdf`. T
 
     - [quarto](https://quarto.org/) installed and on your PATH
     - Microsoft Word installed (needed by `docx2pdf`)
-    - `docx2pdf` installed in your conda env (`pip install docx2pdf`)
+    - `docx2pdf` installed in your venv (`pip install docx2pdf`)
     - Trained model outputs in `./output/final_model/` (run `train_model.py` first if the folder is empty)
